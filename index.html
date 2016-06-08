@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+.land {
+  fill: #222;
+}
+
+.county-boundary {
+  fill: none;
+  stroke: #fff;
+  stroke-width: .5px;
+}
+
+.state-boundary {
+  fill: none;
+  stroke: #fff;
+}
+
+.border {
+  stroke: #000;
+  fill: none;
+
+}
+.graticule {
+  fill: none;
+  stroke: #777;
+  stroke-width: .5px;
+  stroke-opacity: .5;
+}
+
+.yes-major {
+  fill: #4393C3;
+}
+
+.yes-plural {
+  fill: #80B6D6;
+}
+
+.no-major {
+  fill: #D6604D;
+}
+
+.no-plural {
+  fill: #E59B8F;
+}
+.dk-major {
+  fill: #D6CD68;
+}
+
+.dk-plural {
+  fill: #E7E2A7;
+}
+
+</style>
+<body>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="//d3js.org/queue.v1.min.js"></script>
+<script src="http://d3js.org/topojson.v1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3-composite-projections/0.3.5/conicConformalEurope-proj.min.js"></script>
+<script>
+
+var width = 1000,
+    height = 800;
+
+//var projection = d3.geo.conicConformalEurope().scale(900);
+var projection = d3.geo.mercator().scale(700).translate([width / 3, 1.55*height]);
+;
+var graticule = d3.geo.graticule();
+
+var path = d3.geo.path()
+    .projection(projection);
+
+var rateById = d3.map();
+
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+var details = d3.select("body").append("div")
+                .attr("id", "details");
+
+var getClass = function(data) {
+  if (typeof data === 'undefined') {
+    return '';
+  }
+  var max = 0, string = '', qualifier = 'plural';
+  data.forEach(function(d) {
+    if (parseInt(d[1]) > max) {
+      max = parseInt(d[1]);
+      string = d[0];
+    }
+  });
+  if (max >= 50) {
+    qualifier = 'major';
+  }
+  return string+'-'+qualifier;
+};
+
+var generateDetailsBox = function(id) {
+  var data = rateById.get(id);
+  if (typeof data === 'undefined') {
+    return '<p>No data</p>';
+  }
+  var html = '<p>'+id+'</p><table><tr><td>Yes</td><td>No</td><td>Don\'t Know</td></tr><tr><td>'+data[0][1]+'%</td><td>'+data[1][1]+'%</td><td>'+data[2][1]+'%</td></tr></table>';
+  return html;
+}
+
+queue()
+    .defer(d3.json, "nuts0.json")
+    .defer(d3.csv, "barometer.csv", function(d) {
+      rateById.set(d.id, [['yes', d.yes1], ['no', d.no1], ['dk', d.dk1]]);
+    })
+    .await(ready);
+
+
+function ready(error, europe) {
+  if (error) throw error;
+  var land = topojson.feature(europe, europe.objects.nuts0);
+    svg.selectAll("path")
+      .data(land.features)
+      .enter()
+      .append("path")
+      .attr("id", function(d) {return d.id;})
+      .attr("d", path)
+      .style("stroke","#000")
+      .style("stroke-width",".5px")
+      .attr("class", function(d) { return getClass(rateById.get(d.id)); })
+      .on("mouseover", function(d,i) {
+        d3.select(this)
+          .transition()
+          .style("fill", "red");
+        d3.select("#details")
+          .html(generateDetailsBox(this.id));
+
+        })
+      .on("mouseout", function(d,i) {
+        d3.select(this)
+          .transition()
+          .style("fill", "");
+        d3.select("#details")
+          .html('');
+
+        });
+
+};
+
+
+</script>
+</body>
+</html>
